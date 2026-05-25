@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WorkspaceRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -12,7 +13,8 @@ import { WorkspacesService } from './workspaces.service';
 import type { ApiResponse } from '../common/dto/api-response.dto';
 import type { AuthUser } from '../common/interfaces/auth-user.interface';
 import type { WorkspaceSummary } from './workspaces.service';
-
+@ApiTags('Workspaces')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('workspaces')
 export class WorkspacesController {

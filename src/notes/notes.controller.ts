@@ -9,11 +9,13 @@ import { WorkspaceRolesGuard } from '../common/guards/workspace-roles.guard';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { NotesService } from './notes.service';
-
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { ApiResponse } from '../common/dto/api-response.dto';
 import type { AuthUser } from '../common/interfaces/auth-user.interface';
 import type { NoteSummary } from './notes.service';
 
+@ApiTags('Notes')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class NotesController {

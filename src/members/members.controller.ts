@@ -8,11 +8,13 @@ import { WorkspaceRolesGuard } from '../common/guards/workspace-roles.guard';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { MembersService } from './members.service';
-
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { ApiResponse } from '../common/dto/api-response.dto';
 import type { AuthUser } from '../common/interfaces/auth-user.interface';
 import type { MemberSummary } from './members.service';
 
+@ApiTags('Members')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class MembersController {
