@@ -17,8 +17,12 @@
 - [Environment Variables](#environment-variables)
 - [Docker Setup](#docker-setup)
 - [Project Setup Instructions](#project-setup-instructions)
+- [Useful Commands](#useful-commands)
 - [API Response Format](#api-response-format)
+- [Automated Testing](#automated-testing)
+- [Logging](#logging)
 - [Postman Testing Guide](#postman-testing-guide)
+- [Common Errors](#common-errors)
 - [Git Commit Suggestions](#git-commit-suggestions)
 - [Future Improvements](#future-improvements)
 
@@ -369,6 +373,24 @@ Server runs on: `http://localhost:3000`
 
 ---
 
+## Useful Commands
+
+```bash
+# Start the backend in development mode
+npm run start:dev
+
+# Run the Jest/Supertest end-to-end tests
+npm run test:e2e
+
+# Apply Prisma database migrations
+npx prisma migrate dev
+
+# Open Prisma Studio to inspect database records
+npx prisma studio
+```
+
+---
+
 ## API Response Format
 
 Most successful responses follow this format:
@@ -380,6 +402,174 @@ Most successful responses follow this format:
   "data": {}
 }
 ```
+
+---
+
+## Automated Testing
+
+This project includes automated end-to-end testing using **Jest** and **Supertest**.
+
+The tests are located inside the `test/` folder:
+
+```text
+test/
+├── jest-e2e.json
+└── workspace-system.e2e-spec.ts
+```
+
+> The default NestJS starter test file `app.e2e-spec.ts` was removed because this project does not use the default `GET /` Hello World route.
+
+### Running E2E Tests
+
+Before running tests, make sure PostgreSQL is running:
+
+```bash
+docker compose up -d
+```
+
+Apply Prisma migrations:
+
+```bash
+npx prisma migrate dev
+```
+
+Run the e2e test suite:
+
+```bash
+npm run test:e2e
+```
+
+**Expected successful result:**
+
+```
+PASS test/workspace-system.e2e-spec.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       19 passed, 19 total
+```
+
+### Test Coverage
+
+| Area | Covered |
+|---|:---:|
+| User registration | ✅ |
+| User login | ✅ |
+| Password is not returned in response | ✅ |
+| JWT protected routes | ✅ |
+| Workspace creation | ✅ |
+| Automatic owner membership creation | ✅ |
+| Get user workspaces | ✅ |
+| Add workspace members | ✅ |
+| Prevent duplicate memberships | ✅ |
+| Member permission restrictions | ✅ |
+| Notes creation | ✅ |
+| Notes reading | ✅ |
+| Viewer cannot create notes | ✅ |
+| Outsider cannot access workspace notes | ✅ |
+| Owner can update notes | ✅ |
+| Owner can update member roles | ✅ |
+| Member cannot delete workspace | ✅ |
+| Owner can delete notes | ✅ |
+
+### Important Testing Notes
+
+The e2e tests use the real application modules and a real PostgreSQL database connection. Because of this, Docker PostgreSQL must be running before tests are executed.
+
+The test file creates temporary users, workspaces, members, and notes during execution. At the end of the test suite, test data is cleared using Prisma in this specific order:
+
+```typescript
+await prisma.note.deleteMany();
+await prisma.workspaceMember.deleteMany();
+await prisma.workspace.deleteMany();
+await prisma.user.deleteMany();
+```
+
+> ⚠️ This cleanup order is important because of relational database constraints. Do not run e2e tests against a production database.
+
+---
+
+## Logging
+
+The project includes a custom request logging middleware located at:
+
+```
+src/common/middleware/request-logger.middleware.ts
+```
+
+It logs each incoming HTTP request after the response is completed in this format:
+
+```
+METHOD URL STATUS_CODE - RESPONSE_TIME
+```
+
+**Example logs:**
+
+```
+POST /auth/register 201 - 313ms
+POST /auth/login 201 - 325ms
+POST /workspaces 201 - 39ms
+GET /workspaces 200 - 12ms
+POST /workspaces/{workspaceId}/members 201 - 43ms
+POST /workspaces 401 - 2ms
+```
+
+These logs show which endpoint was called, the HTTP method used, whether the request succeeded or failed, how long it took, and whether any authentication or permission issues occurred.
+
+### Request Logger Middleware
+
+```typescript
+import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
+import { NextFunction, Request, Response } from 'express';
+
+@Injectable()
+export class RequestLoggerMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(RequestLoggerMiddleware.name);
+
+  use(request: Request, response: Response, next: NextFunction): void {
+    const startTime = Date.now();
+    const { method, originalUrl } = request;
+
+    response.on('finish', () => {
+      const duration = Date.now() - startTime;
+      const { statusCode } = response;
+
+      this.logger.log(`${method} ${originalUrl} ${statusCode} - ${duration}ms`);
+    });
+
+    next();
+  }
+}
+```
+
+The middleware is registered globally in `app.module.ts`:
+
+```typescript
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}
+```
+
+### How Logging Helps This Project
+
+Because the system contains protected routes and role-based access control, logs make it easy to trace issues at a glance:
+
+| Log Example | Meaning |
+|---|---|
+| `POST /workspaces 401 - 2ms` | User tried to create a workspace without a valid JWT token |
+| `POST /workspaces/{id}/members 404 - 23ms` | Request reached the endpoint but the target user email was not found |
+| `POST /workspaces/{id}/members 201 - 43ms` | Member was successfully added to the workspace |
+
+### Testing and Logging Summary
+
+| Method | Tools Used |
+|---|---|
+| Manual testing | Swagger UI, Postman |
+| Automated testing | Jest, Supertest |
+| Request logging | NestJS Logger, Custom middleware |
+
+Together, testing and logging verify that the backend works correctly and make it easier to debug authentication, authorization, workspace isolation, and role-based access control issues.
 
 ---
 
@@ -763,6 +953,18 @@ Most successful responses follow this format:
 
 ---
 
+### User not found error
+```json
+{
+  "message": "User not found",
+  "error": "Not Found",
+  "statusCode": 404
+}
+```
+**Cause:** Trying to add a member email that is not registered in the system.
+
+---
+
 ## Git Commit Suggestions
 
 ```bash
@@ -786,6 +988,9 @@ git commit -m "Add RBAC guards and permission logic"
 
 git add .
 git commit -m "Update README with setup and API testing guide"
+
+git add README.md
+git commit -m "Document testing and logging implementation"
 ```
 
 ---
@@ -793,8 +998,8 @@ git commit -m "Update README with setup and API testing guide"
 ## Future Improvements
 
 - [ ] Swagger API documentation
-- [ ] Unit tests using Jest
-- [ ] E2E tests using Supertest
+- [x] Unit tests using Jest
+- [x] E2E tests using Supertest
 - [ ] Pagination for notes
 - [ ] Search and filtering
 - [ ] Invitation system
