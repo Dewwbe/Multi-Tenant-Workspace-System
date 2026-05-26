@@ -16,7 +16,9 @@ async function bootstrap(): Promise<void> {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Multi-Tenant Workspace System API')
-    .setDescription('Backend API for a multi-tenant workspace system with RBAC and workspace isolation.')
+    .setDescription(
+      'Backend API for a multi-tenant workspace system with RBAC and workspace isolation.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();

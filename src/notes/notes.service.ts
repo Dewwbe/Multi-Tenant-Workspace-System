@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Note, WorkspaceRole } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,7 +18,11 @@ export class NotesService {
     private readonly membersService: MembersService,
   ) {}
 
-  async create(userId: string, workspaceId: string, dto: CreateNoteDto): Promise<NoteSummary> {
+  async create(
+    userId: string,
+    workspaceId: string,
+    dto: CreateNoteDto,
+  ): Promise<NoteSummary> {
     return this.prisma.note.create({
       data: {
         title: dto.title,
@@ -32,7 +40,11 @@ export class NotesService {
     });
   }
 
-  async update(userId: string, noteId: string, dto: UpdateNoteDto): Promise<NoteSummary> {
+  async update(
+    userId: string,
+    noteId: string,
+    dto: UpdateNoteDto,
+  ): Promise<NoteSummary> {
     const note = await this.findNoteOrThrow(noteId);
 
     await this.ensureCanModifyNote(userId, note);
@@ -66,14 +78,20 @@ export class NotesService {
   }
 
   private async ensureCanModifyNote(userId: string, note: Note): Promise<void> {
-    const membership = await this.membersService.getMembershipOrThrow(userId, note.workspaceId);
+    const membership = await this.membersService.getMembershipOrThrow(
+      userId,
+      note.workspaceId,
+    );
 
     const isCreator = note.createdBy === userId;
     const isAdminOrOwner =
-      membership.role === WorkspaceRole.ADMIN || membership.role === WorkspaceRole.OWNER;
+      membership.role === WorkspaceRole.ADMIN ||
+      membership.role === WorkspaceRole.OWNER;
 
     if (!isCreator && !isAdminOrOwner) {
-      throw new ForbiddenException('You do not have permission to modify this note');
+      throw new ForbiddenException(
+        'You do not have permission to modify this note',
+      );
     }
   }
 }

@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WorkspaceRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -30,7 +39,9 @@ export class WorkspacesController {
   }
 
   @Get()
-  async findMine(@CurrentUser() user: AuthUser): Promise<ApiResponse<WorkspaceSummary[]>> {
+  async findMine(
+    @CurrentUser() user: AuthUser,
+  ): Promise<ApiResponse<WorkspaceSummary[]>> {
     const workspaces = await this.workspacesService.findUserWorkspaces(user.id);
     return apiResponse('Workspaces fetched successfully', workspaces);
   }

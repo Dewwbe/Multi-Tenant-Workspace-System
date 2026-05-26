@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { WorkspaceRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -40,13 +45,17 @@ export class WorkspaceRolesGuard implements CanActivate {
     });
 
     if (!membership || !requiredRoles.includes(membership.role)) {
-      throw new ForbiddenException('You do not have permission for this action');
+      throw new ForbiddenException(
+        'You do not have permission for this action',
+      );
     }
 
     return true;
   }
 
-  private getParamAsString(param: string | string[] | undefined): string | undefined {
+  private getParamAsString(
+    param: string | string[] | undefined,
+  ): string | undefined {
     if (Array.isArray(param)) {
       return param[0];
     }

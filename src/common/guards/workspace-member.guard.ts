@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 
@@ -30,7 +35,9 @@ export class WorkspaceMemberGuard implements CanActivate {
     return true;
   }
 
-  private getParamAsString(param: string | string[] | undefined): string | undefined {
+  private getParamAsString(
+    param: string | string[] | undefined,
+  ): string | undefined {
     if (Array.isArray(param)) {
       return param[0];
     }

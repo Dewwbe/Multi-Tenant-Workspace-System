@@ -16,7 +16,10 @@ export type MemberSummary = WorkspaceMember;
 export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async addMember(workspaceId: string, dto: AddMemberDto): Promise<MemberSummary> {
+  async addMember(
+    workspaceId: string,
+    dto: AddMemberDto,
+  ): Promise<MemberSummary> {
     if (dto.role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Owner role cannot be assigned here');
     }
@@ -57,12 +60,16 @@ export class MembersService {
     dto: UpdateMemberRoleDto,
   ): Promise<MemberSummary> {
     if (dto.role === WorkspaceRole.OWNER) {
-      throw new BadRequestException('Owner role cannot be assigned from this endpoint');
+      throw new BadRequestException(
+        'Owner role cannot be assigned from this endpoint',
+      );
     }
 
     const targetMember = await this.findMemberOrThrow(memberId);
 
-    await this.requireRole(actorUserId, targetMember.workspaceId, [WorkspaceRole.OWNER]);
+    await this.requireRole(actorUserId, targetMember.workspaceId, [
+      WorkspaceRole.OWNER,
+    ]);
 
     if (targetMember.role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Owner role cannot be changed');
@@ -76,7 +83,10 @@ export class MembersService {
 
   async removeMember(actorUserId: string, memberId: string): Promise<void> {
     const targetMember = await this.findMemberOrThrow(memberId);
-    const actorMember = await this.getMembershipOrThrow(actorUserId, targetMember.workspaceId);
+    const actorMember = await this.getMembershipOrThrow(
+      actorUserId,
+      targetMember.workspaceId,
+    );
 
     if (targetMember.role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Owner cannot be removed');
@@ -86,10 +96,13 @@ export class MembersService {
     const actorIsAdmin = actorMember.role === WorkspaceRole.ADMIN;
 
     const targetIsLowerRole =
-      targetMember.role === WorkspaceRole.MEMBER || targetMember.role === WorkspaceRole.VIEWER;
+      targetMember.role === WorkspaceRole.MEMBER ||
+      targetMember.role === WorkspaceRole.VIEWER;
 
     if (!actorIsOwner && !(actorIsAdmin && targetIsLowerRole)) {
-      throw new ForbiddenException('You do not have permission to remove this member');
+      throw new ForbiddenException(
+        'You do not have permission to remove this member',
+      );
     }
 
     await this.prisma.workspaceMember.delete({
@@ -97,7 +110,10 @@ export class MembersService {
     });
   }
 
-  async getMembershipOrThrow(userId: string, workspaceId: string): Promise<WorkspaceMember> {
+  async getMembershipOrThrow(
+    userId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceMember> {
     const membership = await this.prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
@@ -122,7 +138,9 @@ export class MembersService {
     const membership = await this.getMembershipOrThrow(userId, workspaceId);
 
     if (!allowedRoles.includes(membership.role)) {
-      throw new ForbiddenException('You do not have permission for this action');
+      throw new ForbiddenException(
+        'You do not have permission for this action',
+      );
     }
 
     return membership;

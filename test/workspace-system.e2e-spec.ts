@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import type { Server } from 'http';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -66,6 +67,7 @@ interface NotesListResponse {
 
 describe('Multi-Tenant Workspace System E2E', () => {
   let app: INestApplication;
+  let httpServer: Server;
   let prisma: PrismaService;
 
   let ownerToken: string;
@@ -102,6 +104,8 @@ describe('Multi-Tenant Workspace System E2E', () => {
     prisma = app.get<PrismaService>(PrismaService);
 
     await app.init();
+
+    httpServer = app.getHttpServer() as Server;
   });
 
   afterAll(async () => {
@@ -114,7 +118,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('registers owner user', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post('/auth/register')
       .send({
         name: 'Owner User',
@@ -134,7 +138,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('logs in owner user', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post('/auth/login')
       .send({
         email: ownerEmail,
@@ -149,11 +153,11 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('blocks protected route without token', async () => {
-    await request(app.getHttpServer()).get('/workspaces').expect(401);
+    await request(httpServer).get('/workspaces').expect(401);
   });
 
   it('creates workspace and owner membership', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post('/workspaces')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -180,7 +184,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('returns only user workspaces', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .get('/workspaces')
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
@@ -203,7 +207,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
     ];
 
     for (const user of users) {
-      await request(app.getHttpServer())
+      await request(httpServer)
         .post('/auth/register')
         .send({
           name: user.name,
@@ -213,7 +217,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
         .expect(201);
     }
 
-    const memberLogin = await request(app.getHttpServer())
+    const memberLogin = await request(httpServer)
       .post('/auth/login')
       .send({
         email: memberEmail,
@@ -221,7 +225,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
       })
       .expect(201);
 
-    const viewerLogin = await request(app.getHttpServer())
+    const viewerLogin = await request(httpServer)
       .post('/auth/login')
       .send({
         email: viewerEmail,
@@ -229,7 +233,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
       })
       .expect(201);
 
-    const outsiderLogin = await request(app.getHttpServer())
+    const outsiderLogin = await request(httpServer)
       .post('/auth/login')
       .send({
         email: outsiderEmail,
@@ -243,7 +247,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('owner adds member to workspace', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post(`/workspaces/${workspaceId}/members`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -261,7 +265,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('owner adds viewer to workspace', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post(`/workspaces/${workspaceId}/members`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -277,7 +281,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('prevents duplicate membership', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post(`/workspaces/${workspaceId}/members`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -288,7 +292,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('member cannot add another member', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post(`/workspaces/${workspaceId}/members`)
       .set('Authorization', `Bearer ${memberToken}`)
       .send({
@@ -299,7 +303,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('owner creates note', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post(`/workspaces/${workspaceId}/notes`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -317,7 +321,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('member creates note', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .post(`/workspaces/${workspaceId}/notes`)
       .set('Authorization', `Bearer ${memberToken}`)
       .send({
@@ -333,7 +337,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('viewer cannot create note', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post(`/workspaces/${workspaceId}/notes`)
       .set('Authorization', `Bearer ${viewerToken}`)
       .send({
@@ -344,7 +348,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('workspace member can read workspace notes', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .get(`/workspaces/${workspaceId}/notes`)
       .set('Authorization', `Bearer ${viewerToken}`)
       .expect(200);
@@ -353,18 +357,20 @@ describe('Multi-Tenant Workspace System E2E', () => {
 
     expect(body.success).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
-    expect(body.data.every((note) => note.workspaceId === workspaceId)).toBe(true);
+    expect(body.data.every((note) => note.workspaceId === workspaceId)).toBe(
+      true,
+    );
   });
 
   it('outsider cannot read workspace notes', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .get(`/workspaces/${workspaceId}/notes`)
       .set('Authorization', `Bearer ${outsiderToken}`)
       .expect(403);
   });
 
   it('owner updates note', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .patch(`/notes/${noteId}`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -380,7 +386,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('owner changes member role', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpServer)
       .patch(`/members/${memberMembershipId}/role`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
@@ -395,14 +401,14 @@ describe('Multi-Tenant Workspace System E2E', () => {
   });
 
   it('member cannot delete workspace', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .delete(`/workspaces/${workspaceId}`)
       .set('Authorization', `Bearer ${memberToken}`)
       .expect(403);
   });
 
   it('owner deletes note', async () => {
-    await request(app.getHttpServer())
+    await request(httpServer)
       .delete(`/notes/${noteId}`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);

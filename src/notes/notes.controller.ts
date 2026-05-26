@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { WorkspaceRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -22,7 +31,11 @@ export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
   @Post('workspaces/:id/notes')
-  @WorkspaceRoles(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.MEMBER)
+  @WorkspaceRoles(
+    WorkspaceRole.OWNER,
+    WorkspaceRole.ADMIN,
+    WorkspaceRole.MEMBER,
+  )
   @UseGuards(WorkspaceRolesGuard)
   async create(
     @CurrentUser() user: AuthUser,
@@ -35,7 +48,9 @@ export class NotesController {
 
   @Get('workspaces/:id/notes')
   @UseGuards(WorkspaceMemberGuard)
-  async findWorkspaceNotes(@Param('id') workspaceId: string): Promise<ApiResponse<NoteSummary[]>> {
+  async findWorkspaceNotes(
+    @Param('id') workspaceId: string,
+  ): Promise<ApiResponse<NoteSummary[]>> {
     const notes = await this.notesService.findWorkspaceNotes(workspaceId);
     return apiResponse('Notes fetched successfully', notes);
   }

@@ -23,7 +23,12 @@ export class UsersService {
   }
 
   toSafeUser(user: User): SafeUser {
-    const { password: _password, ...safeUser } = user;
-    return safeUser;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

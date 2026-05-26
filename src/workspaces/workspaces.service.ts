@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Workspace, WorkspaceRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -10,7 +14,10 @@ export type WorkspaceSummary = Workspace;
 export class WorkspacesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(ownerId: string, dto: CreateWorkspaceDto): Promise<WorkspaceSummary> {
+  async create(
+    ownerId: string,
+    dto: CreateWorkspaceDto,
+  ): Promise<WorkspaceSummary> {
     const existing = await this.prisma.workspace.findUnique({
       where: { slug: dto.slug },
     });
