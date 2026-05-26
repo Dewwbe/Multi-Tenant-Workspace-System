@@ -23,18 +23,27 @@
 - [Logging](#logging)
 - [Postman Testing Guide](#postman-testing-guide)
 - [Common Errors](#common-errors)
-- [Git Commit Suggestions](#git-commit-suggestions)
+- [Git Workflow](#git-workflow)
 - [Future Improvements](#future-improvements)
 
 ---
 
 ## Project Overview
 
-The **Multi-Tenant Workspace System** is an advanced backend project built using **NestJS**, **TypeScript**, **Prisma**, and **PostgreSQL**.
+The **Multi-Tenant Workspace System** is a NestJS backend project built using **TypeScript**, **Prisma**, and **PostgreSQL**.
 
-This project simulates a real-world SaaS backend system where multiple users can create and manage workspaces. Each workspace acts as a separate tenant, and users can only access the data that belongs to the workspaces they are members of.
+This project simulates a real-world SaaS backend where users can create and manage workspaces. Each workspace acts as a separate tenant, and users can only access data that belongs to workspaces where they are members.
 
-The main focus of this project is not only CRUD operations, but also backend architecture, workspace isolation, role-based access control, reusable authorization logic, and maintainable NestJS module design.
+The project focuses on:
+
+- Multi-tenant backend architecture
+- JWT authentication
+- Role-based access control
+- Workspace-level data isolation
+- Clean NestJS module structure
+- Reusable authorization logic
+- Prisma-based relational database design
+- Automated testing and request logging
 
 ---
 
@@ -53,33 +62,46 @@ The main focus of this project is not only CRUD operations, but also backend arc
 - DTO validation using `class-validator`
 - Thin controllers and service-based business logic
 - Reusable guards and decorators
+- Request logging middleware
+- End-to-end testing using Jest and Supertest
 
 ---
 
 ## Technologies Used
 
 ### Backend
+
 - Node.js
 - NestJS
 - TypeScript
 
 ### Database
+
 - PostgreSQL
 - Prisma ORM
 
 ### Authentication
+
 - JWT
 - Passport JWT
 - bcrypt
 
 ### Validation
+
 - class-validator
 - class-transformer
 
+### Testing
+
+- Jest
+- Supertest
+
 ### Development Tools
+
 - Docker
-- Postman
 - Prisma CLI
+- Postman
+- Swagger
 - VS Code
 
 ---
@@ -136,10 +158,12 @@ src/
 │   ├── guards/
 │   │   ├── workspace-member.guard.ts
 │   │   └── workspace-roles.guard.ts
-│   └── interfaces/
-│       ├── auth-user.interface.ts
-│       ├── authenticated-request.interface.ts
-│       └── jwt-payload.interface.ts
+│   ├── interfaces/
+│   │   ├── auth-user.interface.ts
+│   │   ├── authenticated-request.interface.ts
+│   │   └── jwt-payload.interface.ts
+│   └── middleware/
+│       └── request-logger.middleware.ts
 │
 ├── prisma/
 │   ├── prisma.module.ts
@@ -161,19 +185,18 @@ Stores registered user details.
 
 | Field | Type |
 |---|---|
-| id | String (UUID) |
+| id | String UUID |
 | name | String |
-| email | String (unique) |
-| password | String (hashed) |
+| email | String unique |
+| password | String hashed |
 | createdAt | DateTime |
 | updatedAt | DateTime |
 
 **Rules:**
-- Email must be unique
-- Password is hashed before saving
-- Password is never returned in API responses
 
----
+- Email must be unique.
+- Password is hashed before saving.
+- Password is never returned in API responses.
 
 ### Workspace
 
@@ -181,18 +204,18 @@ Represents a tenant or workspace.
 
 | Field | Type |
 |---|---|
-| id | String (UUID) |
+| id | String UUID |
 | name | String |
-| slug | String (unique) |
+| slug | String unique |
 | ownerId | String |
 | createdAt | DateTime |
 | updatedAt | DateTime |
 
 **Rules:**
-- Slug must be unique
-- Workspace creator automatically becomes the owner
 
----
+- Slug must be unique.
+- Workspace creator automatically becomes the owner.
+- Workspace creation and owner membership creation are handled in a transaction.
 
 ### WorkspaceMember
 
@@ -200,20 +223,25 @@ Stores users who belong to a workspace.
 
 | Field | Type |
 |---|---|
-| id | String (UUID) |
+| id | String UUID |
 | workspaceId | String |
 | userId | String |
 | role | WorkspaceRole |
 | createdAt | DateTime |
 
-**Available roles:** `OWNER` · `ADMIN` · `MEMBER` · `VIEWER`
+**Available roles:**
+
+- `OWNER`
+- `ADMIN`
+- `MEMBER`
+- `VIEWER`
 
 **Rules:**
-- Duplicate memberships are prevented
-- A user can belong to many workspaces
-- A workspace can have many users
 
----
+- Duplicate memberships are prevented.
+- A user can belong to many workspaces.
+- A workspace can have many users.
+- Owner membership is created automatically when a workspace is created.
 
 ### Note
 
@@ -221,7 +249,7 @@ Stores notes created inside a workspace.
 
 | Field | Type |
 |---|---|
-| id | String (UUID) |
+| id | String UUID |
 | title | String |
 | content | String |
 | workspaceId | String |
@@ -230,40 +258,47 @@ Stores notes created inside a workspace.
 | updatedAt | DateTime |
 
 **Rules:**
-- Notes belong to a workspace
-- Notes belong to a creator
-- Users can only access notes from their own workspace
+
+- Notes belong to a workspace.
+- Notes belong to a creator.
+- Users can only access notes from workspaces where they are members.
 
 ---
 
 ## Role-Based Access Control
 
 | Action | OWNER | ADMIN | MEMBER | VIEWER |
-|---|:---:|:---:|:---:|:---:|
+|---|---|---|---|---|
 | Create workspace | ✅ | ✅ | ✅ | ✅ |
+| View own workspaces | ✅ | ✅ | ✅ | ✅ |
 | Update workspace | ✅ | ✅ | ❌ | ❌ |
 | Delete workspace | ✅ | ❌ | ❌ | ❌ |
 | Add members | ✅ | ✅ | ❌ | ❌ |
+| Add another ADMIN | ✅ | ❌ | ❌ | ❌ |
 | Change member roles | ✅ | ❌ | ❌ | ❌ |
 | Remove members | ✅ | Limited | ❌ | ❌ |
 | Create notes | ✅ | ✅ | ✅ | ❌ |
 | View notes | ✅ | ✅ | ✅ | ✅ |
-| Update notes | ✅ | ✅ | Creator only | ❌ |
-| Delete notes | ✅ | ✅ | Creator only | ❌ |
+| Update notes | ✅ | ✅ | Creator only if still MEMBER | ❌ |
+| Delete notes | ✅ | ✅ | Creator only if still MEMBER | ❌ |
 
 ---
 
 ## Tenant Isolation
 
-Tenant isolation is one of the most important parts of this project. Each workspace acts as a separate tenant. All workspace-related data is filtered using `workspaceId`.
+Tenant isolation is one of the most important parts of this project.
 
-❌ **Bad example:**
-```typescript
+Each workspace acts as a separate tenant. Workspace-related data must always be filtered using `workspaceId` or through the authenticated user's workspace membership.
+
+**Bad example:**
+
+```ts
 return this.prisma.note.findMany();
 ```
 
-✅ **Good example:**
-```typescript
+**Good example:**
+
+```ts
 return this.prisma.note.findMany({
   where: {
     workspaceId,
@@ -271,30 +306,39 @@ return this.prisma.note.findMany({
 });
 ```
 
-This prevents users from accessing notes or resources from another workspace.
+For record-level operations such as updating or deleting notes and members, the system should not reveal whether a resource exists in another tenant.
+
+For example, if a user from another workspace tries to update a note by ID, the API should return `404 Not Found` instead of revealing that the note exists with a `403 Forbidden`.
 
 ---
 
 ## Authentication Flow
 
-1. User registers using `POST /auth/register`
-2. Password is hashed using bcrypt
-3. User logs in using `POST /auth/login`
-4. Server returns a JWT access token
-5. Protected routes require the token in the `Authorization` header
-
-```
-Authorization: Bearer ACCESS_TOKEN
-```
+1. User registers using:
+   ```
+   POST /auth/register
+   ```
+2. Password is hashed using bcrypt.
+3. User logs in using:
+   ```
+   POST /auth/login
+   ```
+4. Server returns a JWT access token.
+5. Protected routes require the token in the `Authorization` header:
+   ```
+   Authorization: Bearer ACCESS_TOKEN
+   ```
 
 ---
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root.
 
-```dotenv
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workspace_db?schema=public"
+Because Docker exposes PostgreSQL from container port `5432` to host port `5433`, the `DATABASE_URL` must use `localhost:5433`.
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/workspace_db?schema=public"
 
 JWT_SECRET="my_super_secret_workspace_key_123456"
 JWT_EXPIRES_IN_SECONDS="86400"
@@ -302,13 +346,19 @@ JWT_EXPIRES_IN_SECONDS="86400"
 PORT=3000
 ```
 
+> **Important:**
+> - Docker container port: `5432`
+> - Host machine port: `5433`
+> - Application uses: `localhost:5433`
+
 ---
 
 ## Docker Setup
 
 The project uses PostgreSQL through Docker.
 
-**`docker-compose.yml`**
+Use the following `docker-compose.yml`:
+
 ```yaml
 services:
   postgres:
@@ -320,7 +370,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: workspace_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -328,48 +378,102 @@ volumes:
   postgres_data:
 ```
 
+**Start PostgreSQL:**
+
 ```bash
-# Start PostgreSQL
 docker compose up -d
+```
 
-# Stop PostgreSQL
+**Stop PostgreSQL:**
+
+```bash
 docker compose down
+```
 
-# Reset PostgreSQL including database volume
+**Reset PostgreSQL including database volume** *(only when you want to delete all local database data):*
+
+```bash
 docker compose down -v
 docker compose up -d
+```
+
+**Check running containers:**
+
+```bash
+docker ps
+```
+
+Expected result should show PostgreSQL running with port mapping similar to:
+
+```
+0.0.0.0:5433->5432/tcp
 ```
 
 ---
 
 ## Project Setup Instructions
 
-### 1. Install dependencies
+### 1. Clone the repository
+
+```bash
+git clone <your-repository-url>
+cd <project-folder-name>
+```
+
+### 2. Install dependencies
+
 ```bash
 npm install
 ```
 
-### 2. Start PostgreSQL
+### 3. Create the `.env` file
+
+Create a `.env` file in the project root:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/workspace_db?schema=public"
+
+JWT_SECRET="my_super_secret_workspace_key_123456"
+JWT_EXPIRES_IN_SECONDS="86400"
+
+PORT=3000
+```
+
+### 4. Start PostgreSQL using Docker
+
 ```bash
 docker compose up -d
 ```
 
-### 3. Generate Prisma client
+### 5. Generate Prisma client
+
 ```bash
 npx prisma generate
 ```
 
-### 4. Run migration
+### 6. Run Prisma migration
+
 ```bash
 npx prisma migrate dev --name init
 ```
 
-### 5. Start development server
+If migrations already exist, use:
+
+```bash
+npx prisma migrate dev
+```
+
+### 7. Start the development server
+
 ```bash
 npm run start:dev
 ```
 
-Server runs on: `http://localhost:3000`
+The server runs on:
+
+```
+http://localhost:3000
+```
 
 ---
 
@@ -379,14 +483,38 @@ Server runs on: `http://localhost:3000`
 # Start the backend in development mode
 npm run start:dev
 
-# Run the Jest/Supertest end-to-end tests
+# Build the project
+npm run build
+
+# Run linting
+npm run lint
+
+# Format the code
+npm run format
+
+# Run unit tests
+npm run test
+
+# Run end-to-end tests
 npm run test:e2e
 
-# Apply Prisma database migrations
+# Generate Prisma client
+npx prisma generate
+
+# Create and apply a new migration
+npx prisma migrate dev --name migration_name
+
+# Apply existing migrations
 npx prisma migrate dev
 
-# Open Prisma Studio to inspect database records
+# Open Prisma Studio
 npx prisma studio
+
+# Start Docker PostgreSQL
+docker compose up -d
+
+# Stop Docker PostgreSQL
+docker compose down
 ```
 
 ---
@@ -403,21 +531,34 @@ Most successful responses follow this format:
 }
 ```
 
+**Example:**
+
+```json
+{
+  "success": true,
+  "message": "Workspace created successfully",
+  "data": {
+    "id": "workspace-id",
+    "name": "EFutures Workspace",
+    "slug": "efutures-workspace",
+    "ownerId": "user-id"
+  }
+}
+```
+
 ---
 
 ## Automated Testing
 
-This project includes automated end-to-end testing using **Jest** and **Supertest**.
+This project includes automated testing using Jest and Supertest.
 
-The tests are located inside the `test/` folder:
+The e2e tests are located inside the `test/` folder:
 
 ```text
 test/
 ├── jest-e2e.json
 └── workspace-system.e2e-spec.ts
 ```
-
-> The default NestJS starter test file `app.e2e-spec.ts` was removed because this project does not use the default `GET /` Hello World route.
 
 ### Running E2E Tests
 
@@ -439,19 +580,84 @@ Run the e2e test suite:
 npm run test:e2e
 ```
 
-**Expected successful result:**
+### Important Testing Note
+
+The current Docker setup uses one local PostgreSQL database: `workspace_db`
+
+For safer testing, it is recommended to add a separate test database before running cleanup-heavy e2e tests.
+
+Until a dedicated test database is added, **do not run e2e tests against a production or important local database.**
+
+### Recommended Test Database Setup
+
+To avoid deleting development data during e2e testing, create a separate test environment.
+
+**1. Create `.env.test`:**
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/workspace_test_db?schema=public"
+
+JWT_SECRET="test_secret_key"
+JWT_EXPIRES_IN_SECONDS="86400"
+
+PORT=3001
+```
+
+**2. Create the test database manually:**
+
+Connect to PostgreSQL and create a separate database:
+
+```bash
+docker exec -it workspace-postgres psql -U postgres
+```
+
+Inside the PostgreSQL shell:
+
+```sql
+CREATE DATABASE workspace_test_db;
+```
+
+Exit:
 
 ```
-PASS test/workspace-system.e2e-spec.ts
-
-Test Suites: 1 passed, 1 total
-Tests:       19 passed, 19 total
+\q
 ```
+
+**3. Install dotenv CLI:**
+
+```bash
+npm install -D dotenv-cli
+```
+
+**4. Update `package.json`:**
+
+```json
+{
+  "scripts": {
+    "test:e2e": "dotenv -e .env.test -- jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:migrate": "dotenv -e .env.test -- prisma migrate deploy"
+  }
+}
+```
+
+**5. Apply migrations to the test database:**
+
+```bash
+npm run test:e2e:migrate
+```
+
+**6. Run e2e tests:**
+
+```bash
+npm run test:e2e
+```
+
+This ensures test cleanup affects only `workspace_test_db`, not the development database.
 
 ### Test Coverage
 
 | Area | Covered |
-|---|:---:|
+|---|---|
 | User registration | ✅ |
 | User login | ✅ |
 | Password is not returned in response | ✅ |
@@ -471,20 +677,15 @@ Tests:       19 passed, 19 total
 | Member cannot delete workspace | ✅ |
 | Owner can delete notes | ✅ |
 
-### Important Testing Notes
+**Recommended additional edge-case tests:**
 
-The e2e tests use the real application modules and a real PostgreSQL database connection. Because of this, Docker PostgreSQL must be running before tests are executed.
-
-The test file creates temporary users, workspaces, members, and notes during execution. At the end of the test suite, test data is cleared using Prisma in this specific order:
-
-```typescript
-await prisma.note.deleteMany();
-await prisma.workspaceMember.deleteMany();
-await prisma.workspace.deleteMany();
-await prisma.user.deleteMany();
-```
-
-> ⚠️ This cleanup order is important because of relational database constraints. Do not run e2e tests against a production database.
+| Area | Required Improvement |
+|---|---|
+| Admin adding admin | Admin should not be able to add another admin |
+| Downgraded creator | A note creator downgraded to VIEWER should not update/delete notes |
+| Tenant isolation for notes | Outsider should receive 404 for another tenant's note ID |
+| Tenant isolation for members | Outsider should receive 404 for another tenant's member ID |
+| Test DB safety | E2E cleanup should run only against a dedicated test database |
 
 ---
 
@@ -496,7 +697,9 @@ The project includes a custom request logging middleware located at:
 src/common/middleware/request-logger.middleware.ts
 ```
 
-It logs each incoming HTTP request after the response is completed in this format:
+It logs each incoming HTTP request after the response is completed.
+
+**Log format:**
 
 ```
 METHOD URL STATUS_CODE - RESPONSE_TIME
@@ -513,63 +716,14 @@ POST /workspaces/{workspaceId}/members 201 - 43ms
 POST /workspaces 401 - 2ms
 ```
 
-These logs show which endpoint was called, the HTTP method used, whether the request succeeded or failed, how long it took, and whether any authentication or permission issues occurred.
+These logs help debug:
 
-### Request Logger Middleware
-
-```typescript
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
-import { NextFunction, Request, Response } from 'express';
-
-@Injectable()
-export class RequestLoggerMiddleware implements NestMiddleware {
-  private readonly logger = new Logger(RequestLoggerMiddleware.name);
-
-  use(request: Request, response: Response, next: NextFunction): void {
-    const startTime = Date.now();
-    const { method, originalUrl } = request;
-
-    response.on('finish', () => {
-      const duration = Date.now() - startTime;
-      const { statusCode } = response;
-
-      this.logger.log(`${method} ${originalUrl} ${statusCode} - ${duration}ms`);
-    });
-
-    next();
-  }
-}
-```
-
-The middleware is registered globally in `app.module.ts`:
-
-```typescript
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
-  }
-}
-```
-
-### How Logging Helps This Project
-
-Because the system contains protected routes and role-based access control, logs make it easy to trace issues at a glance:
-
-| Log Example | Meaning |
-|---|---|
-| `POST /workspaces 401 - 2ms` | User tried to create a workspace without a valid JWT token |
-| `POST /workspaces/{id}/members 404 - 23ms` | Request reached the endpoint but the target user email was not found |
-| `POST /workspaces/{id}/members 201 - 43ms` | Member was successfully added to the workspace |
-
-### Testing and Logging Summary
-
-| Method | Tools Used |
-|---|---|
-| Manual testing | Swagger UI, Postman |
-| Automated testing | Jest, Supertest |
-| Request logging | NestJS Logger, Custom middleware |
-
-Together, testing and logging verify that the backend works correctly and make it easier to debug authentication, authorization, workspace isolation, and role-based access control issues.
+- Authentication issues
+- Authorization failures
+- RBAC behavior
+- Request duration
+- Endpoint usage
+- Failed requests
 
 ---
 
@@ -577,14 +731,13 @@ Together, testing and logging verify that the backend works correctly and make i
 
 **Base URL:** `http://localhost:3000`
 
----
-
 ### 1. Register Owner User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/register` |
+```
+POST /auth/register
+```
+
+Body:
 
 ```json
 {
@@ -594,16 +747,15 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> Copy the returned `accessToken`.
-
----
+Copy the returned `accessToken`.
 
 ### 2. Login Owner User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/login` |
+```
+POST /auth/login
+```
+
+Body:
 
 ```json
 {
@@ -612,17 +764,14 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> No Bearer Token needed for login.
-
----
-
 ### 3. Create Workspace
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+POST /workspaces
+Authorization: Bearer OWNER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -631,26 +780,22 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> Copy the returned workspace `id`.
-
----
+Copy the returned workspace `id`.
 
 ### 4. Get My Workspaces
 
-| | |
-|---|---|
-| **Method** | `GET` |
-| **URL** | `http://localhost:3000/workspaces` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
-
----
+```
+GET /workspaces
+Authorization: Bearer OWNER_TOKEN
+```
 
 ### 5. Register Member User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/register` |
+```
+POST /auth/register
+```
+
+Body:
 
 ```json
 {
@@ -660,17 +805,14 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 6. Add Member to Workspace
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/members` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+POST /workspaces/WORKSPACE_ID/members
+Authorization: Bearer OWNER_TOKEN
+```
 
-> Replace `WORKSPACE_ID` with the real workspace id.
+Body:
 
 ```json
 {
@@ -679,14 +821,13 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 7. Register Viewer User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/register` |
+```
+POST /auth/register
+```
+
+Body:
 
 ```json
 {
@@ -696,15 +837,14 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 8. Add Viewer to Workspace
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/members` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+POST /workspaces/WORKSPACE_ID/members
+Authorization: Bearer OWNER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -713,15 +853,14 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 9. Create Note as Owner
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/notes` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+POST /workspaces/WORKSPACE_ID/notes
+Authorization: Bearer OWNER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -730,26 +869,22 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> Copy the returned note `id`.
+Copy the returned note `id`.
 
----
+### 10. Get Workspace Notes
 
-### 10. Get Workspace Notes as Owner
-
-| | |
-|---|---|
-| **Method** | `GET` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/notes` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
-
----
+```
+GET /workspaces/WORKSPACE_ID/notes
+Authorization: Bearer OWNER_TOKEN
+```
 
 ### 11. Login Member User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/login` |
+```
+POST /auth/login
+```
+
+Body:
 
 ```json
 {
@@ -758,17 +893,16 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> Copy the returned token as `MEMBER_TOKEN`.
-
----
+Copy the returned token as `MEMBER_TOKEN`.
 
 ### 12. Create Note as Member
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/notes` |
-| **Authorization** | Bearer Token: `MEMBER_TOKEN` |
+```
+POST /workspaces/WORKSPACE_ID/notes
+Authorization: Bearer MEMBER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -777,16 +911,15 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> **Expected result:** success — a member is allowed to create notes.
-
----
+**Expected result:** Success. `MEMBER` can create notes.
 
 ### 13. Login Viewer User
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/auth/login` |
+```
+POST /auth/login
+```
+
+Body:
 
 ```json
 {
@@ -795,17 +928,16 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-> Copy the returned token as `VIEWER_TOKEN`.
-
----
+Copy the returned token as `VIEWER_TOKEN`.
 
 ### 14. Try to Create Note as Viewer
 
-| | |
-|---|---|
-| **Method** | `POST` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/notes` |
-| **Authorization** | Bearer Token: `VIEWER_TOKEN` |
+```
+POST /workspaces/WORKSPACE_ID/notes
+Authorization: Bearer VIEWER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -814,7 +946,8 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
-**Expected result — confirms RBAC is working:**
+**Expected result:**
+
 ```json
 {
   "message": "You do not have permission for this action",
@@ -823,27 +956,23 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 15. Get Notes as Viewer
 
-| | |
-|---|---|
-| **Method** | `GET` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID/notes` |
-| **Authorization** | Bearer Token: `VIEWER_TOKEN` |
+```
+GET /workspaces/WORKSPACE_ID/notes
+Authorization: Bearer VIEWER_TOKEN
+```
 
-> **Expected result:** success — viewer can read notes but cannot create them.
-
----
+**Expected result:** Success. `VIEWER` can read notes but cannot create them.
 
 ### 16. Update Note as Owner
 
-| | |
-|---|---|
-| **Method** | `PATCH` |
-| **URL** | `http://localhost:3000/notes/NOTE_ID` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+PATCH /notes/NOTE_ID
+Authorization: Bearer OWNER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -852,25 +981,21 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 17. Delete Note as Owner
 
-| | |
-|---|---|
-| **Method** | `DELETE` |
-| **URL** | `http://localhost:3000/notes/NOTE_ID` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
-
----
+```
+DELETE /notes/NOTE_ID
+Authorization: Bearer OWNER_TOKEN
+```
 
 ### 18. Update Workspace as Owner
 
-| | |
-|---|---|
-| **Method** | `PATCH` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
+```
+PATCH /workspaces/WORKSPACE_ID
+Authorization: Bearer OWNER_TOKEN
+```
+
+Body:
 
 ```json
 {
@@ -878,17 +1003,15 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 19. Try to Delete Workspace as Member
 
-| | |
-|---|---|
-| **Method** | `DELETE` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID` |
-| **Authorization** | Bearer Token: `MEMBER_TOKEN` |
+```
+DELETE /workspaces/WORKSPACE_ID
+Authorization: Bearer MEMBER_TOKEN
+```
 
-**Expected result — confirms only the owner can delete a workspace:**
+**Expected result:**
+
 ```json
 {
   "message": "You do not have permission for this action",
@@ -897,25 +1020,37 @@ Together, testing and logging verify that the backend works correctly and make i
 }
 ```
 
----
-
 ### 20. Delete Workspace as Owner
 
-> ⚠️ Use this only at the end of testing.
+> Use this only at the end of testing.
 
-| | |
-|---|---|
-| **Method** | `DELETE` |
-| **URL** | `http://localhost:3000/workspaces/WORKSPACE_ID` |
-| **Authorization** | Bearer Token: `OWNER_TOKEN` |
-
-> **Expected result:** success.
+```
+DELETE /workspaces/WORKSPACE_ID
+Authorization: Bearer OWNER_TOKEN
+```
 
 ---
 
 ## Common Errors
 
+### Database connection error
+
+**Example:**
+
+```
+Can't reach database server at localhost:5432
+```
+
+**Cause:** The application is trying to connect to port `5432`, but Docker exposes PostgreSQL on host port `5433`.
+
+**Fix:** Update `.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/workspace_db?schema=public"
+```
+
 ### Login method error
+
 ```json
 {
   "message": "Cannot GET /auth/login",
@@ -923,25 +1058,27 @@ Together, testing and logging verify that the backend works correctly and make i
   "statusCode": 404
 }
 ```
+
 **Fix:** Use `POST /auth/login`, not `GET /auth/login`.
 
----
-
 ### Protected route error
+
 ```json
 {
   "message": "Unauthorized",
   "statusCode": 401
 }
 ```
-**Causes:**
-- Token is missing
-- Token is invalid or expired
-- Authorization type is not set to Bearer Token
 
----
+**Common causes:**
+
+- Token is missing.
+- Token is invalid.
+- Token is expired.
+- Authorization type is not set to Bearer Token.
 
 ### Permission error
+
 ```json
 {
   "message": "You do not have permission for this action",
@@ -949,11 +1086,11 @@ Together, testing and logging verify that the backend works correctly and make i
   "statusCode": 403
 }
 ```
+
 **Cause:** The user is authenticated but does not have the required workspace role.
 
----
-
 ### User not found error
+
 ```json
 {
   "message": "User not found",
@@ -961,49 +1098,69 @@ Together, testing and logging verify that the backend works correctly and make i
   "statusCode": 404
 }
 ```
+
 **Cause:** Trying to add a member email that is not registered in the system.
 
 ---
 
-## Git Commit Suggestions
+## Git Workflow
+
+This project should be maintained inside a proper Git repository with regular commits.
+
+**Initialize Git:**
+
+```bash
+git init
+```
+
+**Check current status:**
+
+```bash
+git status
+```
+
+**Add files:**
 
 ```bash
 git add .
-git commit -m "Initialize NestJS backend project"
+```
+
+**Commit changes:**
+
+```bash
+git commit -m "Initial project setup"
+```
+
+**Recommended commit order:**
+
+```bash
+git add README.md docker-compose.yml
+git commit -m "Fix README setup instructions and PostgreSQL port"
 
 git add .
-git commit -m "Add Prisma schema and database models"
+git commit -m "Fix linting and formatting issues"
 
-git add .
-git commit -m "Implement authentication with JWT"
+git add tsconfig.json eslint.config.mjs
+git commit -m "Enable strict TypeScript and unsafe any lint rules"
 
-git add .
-git commit -m "Implement workspace and member management"
+git add src/members src/notes
+git commit -m "Fix RBAC and tenant isolation edge cases"
 
-git add .
-git commit -m "Implement notes with workspace isolation"
-
-git add .
-git commit -m "Add RBAC guards and permission logic"
-
-git add .
-git commit -m "Update README with setup and API testing guide"
-
-git add README.md
-git commit -m "Document testing and logging implementation"
+git add test .env.test package.json
+git commit -m "Add safe e2e test database setup and edge case tests"
 ```
 
 ---
 
 ## Future Improvements
 
-- [ ] Swagger API documentation
-- [x] Unit tests using Jest
-- [x] E2E tests using Supertest
+- [ ] Dedicated test database setup
+- [ ] Stronger tenant isolation for record-level routes
+- [ ] RBAC edge-case tests
 - [ ] Pagination for notes
 - [ ] Search and filtering
 - [ ] Invitation system
 - [ ] Activity logs
 - [ ] Soft delete
 - [ ] Redis caching
-- [ ] Docker support for the full backend application
+- [ ] Docker support for full backend application
