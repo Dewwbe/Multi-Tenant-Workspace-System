@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WorkspaceRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -16,7 +17,7 @@ import { WorkspaceRolesGuard } from '../common/guards/workspace-roles.guard';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { MembersService } from './members.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import type { ApiResponse } from '../common/dto/api-response.dto';
 import type { AuthUser } from '../common/interfaces/auth-user.interface';
 import type { MemberSummary } from './members.service';
@@ -32,10 +33,16 @@ export class MembersController {
   @WorkspaceRoles(WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
   @UseGuards(WorkspaceRolesGuard)
   async addMember(
+    @CurrentUser() user: AuthUser,
     @Param('id') workspaceId: string,
     @Body() dto: AddMemberDto,
   ): Promise<ApiResponse<MemberSummary>> {
-    const member = await this.membersService.addMember(workspaceId, dto);
+    const member = await this.membersService.addMember(
+      user.id,
+      workspaceId,
+      dto,
+    );
+
     return apiResponse('Member added successfully', member);
   }
 
@@ -46,6 +53,7 @@ export class MembersController {
     @Body() dto: UpdateMemberRoleDto,
   ): Promise<ApiResponse<MemberSummary>> {
     const member = await this.membersService.updateRole(user.id, memberId, dto);
+
     return apiResponse('Member role updated successfully', member);
   }
 
@@ -55,6 +63,7 @@ export class MembersController {
     @Param('id') memberId: string,
   ): Promise<ApiResponse<{ id: string }>> {
     await this.membersService.removeMember(user.id, memberId);
+
     return apiResponse('Member removed successfully', { id: memberId });
   }
 }

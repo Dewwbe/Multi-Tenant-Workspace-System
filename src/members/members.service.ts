@@ -17,11 +17,35 @@ export class MembersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async addMember(
+    actorUserId: string,
     workspaceId: string,
     dto: AddMemberDto,
   ): Promise<MemberSummary> {
-    if (dto.role === WorkspaceRole.OWNER) {
+    const actorMembership = await this.getMembershipOrThrow(
+      actorUserId,
+      workspaceId,
+    );
+
+    const requestedRole = dto.role ?? WorkspaceRole.MEMBER;
+
+    if (requestedRole === WorkspaceRole.OWNER) {
       throw new BadRequestException('Owner role cannot be assigned here');
+    }
+
+    if (
+      actorMembership.role === WorkspaceRole.ADMIN &&
+      requestedRole === WorkspaceRole.ADMIN
+    ) {
+      throw new ForbiddenException('Admin cannot add another admin');
+    }
+
+    if (
+      actorMembership.role !== WorkspaceRole.OWNER &&
+      actorMembership.role !== WorkspaceRole.ADMIN
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission for this action',
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -49,7 +73,7 @@ export class MembersService {
       data: {
         workspaceId,
         userId: user.id,
-        role: dto.role ?? WorkspaceRole.MEMBER,
+        role: requestedRole,
       },
     });
   }
@@ -65,7 +89,10 @@ export class MembersService {
       );
     }
 
-    const targetMember = await this.findMemberOrThrow(memberId);
+    const targetMember = await this.findMemberInActorWorkspaceOrThrow(
+      actorUserId,
+      memberId,
+    );
 
     await this.requireRole(actorUserId, targetMember.workspaceId, [
       WorkspaceRole.OWNER,
@@ -82,7 +109,11 @@ export class MembersService {
   }
 
   async removeMember(actorUserId: string, memberId: string): Promise<void> {
-    const targetMember = await this.findMemberOrThrow(memberId);
+    const targetMember = await this.findMemberInActorWorkspaceOrThrow(
+      actorUserId,
+      memberId,
+    );
+
     const actorMember = await this.getMembershipOrThrow(
       actorUserId,
       targetMember.workspaceId,
@@ -146,9 +177,21 @@ export class MembersService {
     return membership;
   }
 
-  private async findMemberOrThrow(memberId: string): Promise<WorkspaceMember> {
-    const member = await this.prisma.workspaceMember.findUnique({
-      where: { id: memberId },
+  private async findMemberInActorWorkspaceOrThrow(
+    actorUserId: string,
+    memberId: string,
+  ): Promise<WorkspaceMember> {
+    const member = await this.prisma.workspaceMember.findFirst({
+      where: {
+        id: memberId,
+        workspace: {
+          members: {
+            some: {
+              userId: actorUserId,
+            },
+          },
+        },
+      },
     });
 
     if (!member) {

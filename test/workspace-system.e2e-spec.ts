@@ -71,6 +71,8 @@ interface NotesListResponse {
   data: NoteResponse['data'][];
 }
 
+jest.setTimeout(30000);
+
 describe('Multi-Tenant Workspace System E2E', () => {
   let app: INestApplication;
   let httpServer: Server;
@@ -82,7 +84,9 @@ describe('Multi-Tenant Workspace System E2E', () => {
   let outsiderToken: string;
 
   let workspaceId: string;
+  let outsiderWorkspaceId: string;
   let noteId: string;
+  let memberNoteId: string;
   let memberMembershipId: string;
 
   const unique = Date.now();
@@ -93,6 +97,12 @@ describe('Multi-Tenant Workspace System E2E', () => {
   const outsiderEmail = `outsider${unique}@example.com`;
 
   beforeAll(async () => {
+    if (!process.env.DATABASE_URL?.includes('workspace_test_db')) {
+      throw new Error(
+        'E2E tests must use workspace_test_db. Check .env.test and test:e2e script.',
+      );
+    }
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -112,6 +122,11 @@ describe('Multi-Tenant Workspace System E2E', () => {
     await app.init();
 
     httpServer = app.getHttpServer() as Server;
+
+    await prisma.note.deleteMany();
+    await prisma.workspaceMember.deleteMany();
+    await prisma.workspace.deleteMany();
+    await prisma.user.deleteMany();
   });
 
   afterAll(async () => {
@@ -249,6 +264,23 @@ describe('Multi-Tenant Workspace System E2E', () => {
     outsiderToken = (outsiderLogin.body as AuthResponse).data.accessToken;
   });
 
+  it('outsider creates own workspace for tenant isolation testing', async () => {
+    const response = await request(httpServer)
+      .post('/workspaces')
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .send({
+        name: 'Outsider Workspace',
+        slug: `outsider-workspace-${unique}`,
+      })
+      .expect(201);
+
+    const body = response.body as WorkspaceResponse;
+
+    outsiderWorkspaceId = body.data.id;
+
+    expect(outsiderWorkspaceId).toBeDefined();
+  });
+
   it('owner adds member to workspace', async () => {
     const response = await request(httpServer)
       .post(`/workspaces/${workspaceId}/members`)
@@ -337,6 +369,8 @@ describe('Multi-Tenant Workspace System E2E', () => {
 
     expect(body.success).toBe(true);
     expect(body.data.workspaceId).toBe(workspaceId);
+
+    memberNoteId = body.data.id;
   });
 
   it('viewer cannot create note', async () => {
@@ -388,7 +422,7 @@ describe('Multi-Tenant Workspace System E2E', () => {
     expect(body.data.title).toBe('Updated Owner Note');
   });
 
-  it('owner changes member role', async () => {
+  it('owner changes member role to admin', async () => {
     const response = await request(httpServer)
       .patch(`/members/${memberMembershipId}/role`)
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -401,6 +435,55 @@ describe('Multi-Tenant Workspace System E2E', () => {
 
     expect(body.success).toBe(true);
     expect(body.data.role).toBe('ADMIN');
+  });
+
+  it('admin cannot add another admin', async () => {
+    await request(httpServer)
+      .post(`/workspaces/${workspaceId}/members`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({
+        email: outsiderEmail,
+        role: 'ADMIN',
+      })
+      .expect(403);
+  });
+
+  it('outsider cannot infer another tenant member exists', async () => {
+    await request(httpServer)
+      .patch(`/members/${memberMembershipId}/role`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .send({
+        role: 'MEMBER',
+      })
+      .expect(404);
+  });
+
+  it('outsider cannot infer another tenant note exists', async () => {
+    await request(httpServer)
+      .patch(`/notes/${noteId}`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .send({
+        title: 'Trying to infer note existence',
+      })
+      .expect(404);
+  });
+
+  it('downgraded note creator cannot update own note as viewer', async () => {
+    await request(httpServer)
+      .patch(`/members/${memberMembershipId}/role`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        role: 'VIEWER',
+      })
+      .expect(200);
+
+    await request(httpServer)
+      .patch(`/notes/${memberNoteId}`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({
+        title: 'Viewer should not update own old note',
+      })
+      .expect(403);
   });
 
   it('member cannot delete workspace', async () => {

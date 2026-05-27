@@ -45,7 +45,7 @@ export class NotesService {
     noteId: string,
     dto: UpdateNoteDto,
   ): Promise<NoteSummary> {
-    const note = await this.findNoteOrThrow(noteId);
+    const note = await this.findAccessibleNoteOrThrow(userId, noteId);
 
     await this.ensureCanModifyNote(userId, note);
 
@@ -56,7 +56,7 @@ export class NotesService {
   }
 
   async remove(userId: string, noteId: string): Promise<void> {
-    const note = await this.findNoteOrThrow(noteId);
+    const note = await this.findAccessibleNoteOrThrow(userId, noteId);
 
     await this.ensureCanModifyNote(userId, note);
 
@@ -65,9 +65,21 @@ export class NotesService {
     });
   }
 
-  private async findNoteOrThrow(noteId: string): Promise<Note> {
-    const note = await this.prisma.note.findUnique({
-      where: { id: noteId },
+  private async findAccessibleNoteOrThrow(
+    userId: string,
+    noteId: string,
+  ): Promise<Note> {
+    const note = await this.prisma.note.findFirst({
+      where: {
+        id: noteId,
+        workspace: {
+          members: {
+            some: {
+              userId,
+            },
+          },
+        },
+      },
     });
 
     if (!note) {
@@ -83,12 +95,14 @@ export class NotesService {
       note.workspaceId,
     );
 
-    const isCreator = note.createdBy === userId;
     const isAdminOrOwner =
       membership.role === WorkspaceRole.ADMIN ||
       membership.role === WorkspaceRole.OWNER;
 
-    if (!isCreator && !isAdminOrOwner) {
+    const isCreatorWithEditRole =
+      note.createdBy === userId && membership.role === WorkspaceRole.MEMBER;
+
+    if (!isAdminOrOwner && !isCreatorWithEditRole) {
       throw new ForbiddenException(
         'You do not have permission to modify this note',
       );
