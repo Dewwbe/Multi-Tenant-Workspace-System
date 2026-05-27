@@ -33,6 +33,12 @@ interface WorkspaceResponse {
   };
 }
 
+interface WorkspacesListResponse {
+  success: boolean;
+  message: string;
+  data: WorkspaceResponse['data'][];
+}
+
 interface MemberResponse {
   success: boolean;
   message: string;
@@ -189,14 +195,11 @@ describe('Multi-Tenant Workspace System E2E', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
 
-    const body = response.body as {
-      success: boolean;
-      data: WorkspaceResponse['data'][];
-    };
+    const body = response.body as WorkspacesListResponse;
 
     expect(body.success).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
-    expect(body.data[0].id).toBe(workspaceId);
+    expect(body.data[0]?.id).toBe(workspaceId);
   });
 
   it('registers member, viewer, and outsider users', async () => {

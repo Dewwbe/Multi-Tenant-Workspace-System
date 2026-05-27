@@ -26,7 +26,12 @@ async function bootstrap(): Promise<void> {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api-docs', app, swaggerDocument);
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  const port = Number(process.env.PORT ?? 3000);
+
+  if (Number.isNaN(port)) {
+    throw new Error('PORT must be a valid number');
+  }
+
   await app.listen(port);
 }
 
